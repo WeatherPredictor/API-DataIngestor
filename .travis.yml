@@ -1,20 +1,85 @@
 language: java
 branches:
   only:
-    - api-ingestor
+    - api-dataingestor-release
 jdk:
   - oraclejdk8
-sudo: false
-install: true
-script: cd "api-ingestor" && mvn clean install -DskipTests=true
+
+sudo: required
+
+services:
+  - docker
+
+install:
+  - cd "api-ingestor" && mvn clean install -DskipTests=true
+  - docker build -t tilaks/dataingestor .
+  - docker ps -a
+  - docker login -e="$DOCKER_EMAIL" -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD"
+  - docker push tilaks/dataingestor
+
+script: mvn clean install -DskipTests=true
+
+after-success:
+  - cd /home/ec2-user/ingestor-microservice
 
 before_deploy:
-  - cd ..
+  - pwd
+  - cd /home/travis/build/airavata-courses/TeamAviato/
   - zip -r SGA_Aviato_DataIngestor.zip api-ingestor scripts appspec.yml || true
   - mkdir -p "dpl_cd_upload"
   - mv SGA_Aviato_DataIngestor.zip dpl_cd_upload/SGA_Aviato_DataIngestor.zip || true
 
 deploy:
+  - provider: s3
+    access_key_id: $AWS_ACCESS_KEY # declared in Travis repo settings
+    secret_access_key: $AWS_SECRET_KEY
+    bucket: teamaviatobucket-ohio
+    local_dir: dpl_cd_upload
+    region: us-east-2
+    skip_cleanup: true
+    acl: public_read
+    detect_encoding: true
+    on:
+      branch: api-dataingestor
+      
+  - provider: codedeploy
+    access_key_id: $AWS_ACCESS_KEY # declared in Travis repo settings
+    secret_access_key: $AWS_SECRET_KEY
+    bucket: teamaviatobucket-ohio
+    key: SGA_Aviato_DataIngestor.zip
+    bundle_type: zip
+    application: TeamAviatoApp-ohio
+    deployment_group: TeamAviatoApp-ohio
+    region: us-east-2
+    skip_cleanup: true
+    on:
+      branch: api-dataingestor
+
+  - provider: s3
+    access_key_id: $AWS_ACCESS_KEY # declared in Travis repo settings
+    secret_access_key: $AWS_SECRET_KEY
+    bucket: teamaviatobucket-ohio
+    local_dir: dpl_cd_upload
+    region: us-east-2
+    skip_cleanup: true
+    acl: public_read
+    detect_encoding: true
+    on:
+      branch: api-dataingestor
+      
+  - provider: codedeploy
+    access_key_id: $AWS_ACCESS_KEY # declared in Travis repo settings
+    secret_access_key: $AWS_SECRET_KEY
+    bucket: teamaviatobucket-ohio
+    key: SGA_Aviato_DataIngestor.zip
+    bundle_type: zip
+    application: TeamAviatoApp-ohio2
+    deployment_group: TeamAviatoApp-ohio2
+    region: us-east-2
+    skip_cleanup: true
+    on:
+      branch: api-dataingestor
+      
   - provider: s3
     access_key_id: $AWS_ACCESS_KEY # declared in Travis repo settings
     secret_access_key: $AWS_SECRET_KEY
@@ -25,7 +90,7 @@ deploy:
     acl: public_read
     detect_encoding: true
     on:
-      branch: api-ingestor
+      branch: api-dataingestor-release
 
   - provider: codedeploy
     access_key_id: $AWS_ACCESS_KEY # declared in Travis repo settings
@@ -38,4 +103,4 @@ deploy:
     region: us-west-2
     skip_cleanup: true
     on:
-      branch: api-ingestor
+      branch: api-dataingestor-release
